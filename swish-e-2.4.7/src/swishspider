@@ -27,6 +27,7 @@ use LWP::UserAgent;
 use HTTP::Status;
 use HTML::Parser 3.00;
 use HTML::LinkExtor;
+use Encode;
 
     if (scalar(@ARGV) != 2) {
         print STDERR "Usage: $0 localpath url\n";
@@ -94,7 +95,7 @@ use HTML::LinkExtor;
     # Don't allow links above the base
     $URI::ABS_REMOTE_LEADING_DOTS = 1;
 
-    $p->parse( $$content_ref );
+    $p->parse( decode_utf8 $$content_ref );
     close( LINKS );
 
     exit;

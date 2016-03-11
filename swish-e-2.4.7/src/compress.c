@@ -995,7 +995,7 @@ void    remove_worddata_longs(unsigned char *worddata,int *sz_worddata)
             progerr("Internal error in remove_worddata_longs");
 
         /* dst may be smaller than src. So move the data */
-        memcpy(dst,src,data_len);
+        memmove(dst,src,data_len);
 
         /* Increase pointers */
         src += data_len;
