@@ -1,0 +1,5 @@
+<div id="title">
+    <h1>[% config.title %]</h1>
+    Common site header here
+</div>
+

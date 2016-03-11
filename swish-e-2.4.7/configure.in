@@ -1,0 +1,431 @@
+AC_PREREQ(2.50)/
+AC_INIT(src/swish.c)
+AC_CONFIG_AUX_DIR(config)
+
+PACKAGE=swish-e
+
+dnl version number
+MAJOR_VERSION=2
+MINOR_VERSION=4
+MICRO_VERSION=7
+INTERFACE_AGE=0
+BINARY_AGE=0
+VERSION=$MAJOR_VERSION.$MINOR_VERSION.$MICRO_VERSION
+
+
+dnl NOT USED
+dnl provide a way to ignore docs
+dnl AC_ARG_ENABLE(docs,
+dnl              AC_HELP_STRING([--disable-docs], [when building from CVS without doc build tools]),
+dnl             docs=no,
+dnl             docs=yes)
+dnl AM_CONDITIONAL(BUILDDOCS, test x$docs = xyes)
+
+
+
+dnl provide a way to build html docs from website
+dnl and check if html docs are available for install
+
+SWISH_WEB=""
+AM_CONDITIONAL(BUILDDOCS, false )
+AM_CONDITIONAL(INSTALLDOCS, false )
+AC_ARG_WITH(website,AC_HELP_STRING([--with-website=DIR],[use swish-e.org website src in DIR (YES if found)]),,withval=no)
+
+if test "x$withval" != "xno"; then
+    dnl find build program
+    SWISH_WEB="$withval/bin/build"
+
+    dnl Not sure how portable -x is (according to the autobook)
+    if test ! -f "$SWISH_WEB"; then
+        AC_MSG_ERROR([Failed to find program to build swish-e html docs "$SWISH_WEB"])
+    fi
+else
+    AC_PATH_PROG([SWISH_WEB],[build-swish-docs])
+fi
+
+if test -n "$SWISH_WEB"; then
+
+    SWISH_WEB_CHK=`$SWISH_WEB -check`
+
+    if test "x$SWISH_WEB_CHK" = xa-ok; then
+        AC_MSG_RESULT([Building html docs with $SWISH_WEB])
+        AC_SUBST(SWISH_WEB)
+        AM_CONDITIONAL(BUILDDOCS, true )
+        AM_CONDITIONAL(INSTALLDOCS, true )
+
+    else
+        AC_MSG_ERROR([problem running '$SWISH_WEB -check'. Returned '$SWISH_WEB_CHECK'])
+    fi
+
+else
+    if test -f "$srcdir/html/readme.html"; then
+        AM_CONDITIONAL(INSTALLDOCS, true)
+    else
+        AC_MSG_WARN([** Not installing HTML docs.  "$srcdir/html/README.html" not found **])
+    fi
+fi
+
+
+
+
+
+
+AC_ARG_ENABLE(daystamp,
+             AC_HELP_STRING([--enable-daystamp], [Adds today's date to version]),
+             daystamp=yes,)
+
+if test x$daystamp = xyes; then
+        TODAY=`/bin/date +%Y-%m-%d`
+        VERSION="$VERSION-$TODAY"
+fi
+
+
+
+dnl Header file for -D defines and sets @DEFS@ to -DHAVE_CONFIG_H
+AM_CONFIG_HEADER(src/acconfig.h)
+
+AM_INIT_AUTOMAKE($PACKAGE, $VERSION)
+
+dnl Enable DLL builds for Win32.  This must come before AC_PROG_LIBTOOL.
+AC_PROG_CC
+AM_PROG_CC_STDC
+AC_C_CONST
+AC_LIBTOOL_WIN32_DLL
+AC_PROG_LIBTOOL
+AM_PROG_LIBTOOL
+
+
+
+dnl prevent automake from generating rules to auto-rebuild tools
+dnl see http://sources.redhat.com/automake/automake.html#maintainer-mode
+dnl developers: either run configure with --enable-maintainer-mode
+dnl or simply rerun ./bootstrap && ./configure when needed
+
+AM_MAINTAINER_MODE
+
+
+
+dnl Check for gettimeofday()
+AC_CHECK_FUNC(BSDgettimeofday,
+              [AC_DEFINE(HAVE_BSDGETTIMEOFDAY,[],[Get time of day])],
+              [AC_CHECK_FUNC(gettimeofday, ,
+                             [AC_DEFINE(NO_GETTOD,[],[Get time of day])])])
+
+
+
+
+dnl check for #! (shebang)
+AC_SYS_INTERPRETER
+
+dnl Set the @SET_MAKE@ variable=make if $(MAKE) not set
+AC_PROG_MAKE_SET
+
+dnl Check for Perl - need full path for scripts
+AC_PATH_PROG([PERL], [perl], [no])
+if test "$PERL" = "false"; then
+    AC_MSG_WARN([perl was not found - needed for script shebang lines])
+fi
+
+
+dnl Check pod2man for creating man pages
+AC_CHECK_PROG([POD2MAN], [pod2man], [pod2man], [false])
+if test "$POD2MAN" = "false"; then
+    dnl disable building of man pages?
+    AC_MSG_WARN([pod2man was not found - needed for building man pages])
+fi
+
+dnl Check for install - used for installing distribution
+AC_PROG_INSTALL
+
+dnl -- from src/configure.in --
+
+dnl Check for a C compiler
+AC_PROG_CC
+
+dnl Check for vsnprintf in libsnprintf.so
+AC_CHECK_LIB(snprintf, vsnprintf)
+
+dnl Checks for header files.
+dnl looks for dirent.h and sets HAVE_DIRENT_H -- do we use?
+AC_HEADER_DIRENT
+
+AC_HEADER_STAT
+AC_HEADER_STDC
+
+dnl Check for some headers
+AC_CHECK_HEADERS(unistd.h stdlib.h string.h sys/timeb.h windows.h)
+AC_CHECK_HEADERS(sys/resource.h sys/param.h)
+
+AC_HEADER_SYS_WAIT
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+AC_TYPE_PID_T
+AC_TYPE_SIZE_T
+AC_STRUCT_TM
+
+dnl Checks for library functions.
+AC_FUNC_ALLOCA
+AC_FUNC_STRFTIME
+AC_FUNC_VPRINTF
+AC_FUNC_FORK
+AC_CHECK_FUNCS(waitpid kill)
+AC_CHECK_FUNCS(re_comp regcomp strdup strstr lstat access)
+AC_CHECK_FUNCS(strchr memcpy)
+AC_CHECK_FUNCS(clock times getrusage)
+AC_CHECK_LIB(m,log)
+
+dnl Allow use strcoll() instead of strncmp()/strncasecmp() to enable locale dependent collating
+AC_FUNC_STRCOLL
+
+AC_FUNC_GETGROUPS
+
+AC_TYPE_GETGROUPS
+
+AC_REPLACE_FUNCS(vsnprintf mkstemp)
+
+dnl Optional building with libxml2
+
+dnl Probably should be 2.4.5 + patches
+LIBXML_REQUIRED_VERSION=2.4.3
+
+AC_ARG_WITH(libxml2,AC_HELP_STRING([--with-libxml2=DIR],[use libxml2 in DIR (YES if found)]),,withval=maybe)
+
+dnl if the user explicity asked for no libxml2
+if test "$withval" != "no"; then
+    dnl find xml2-config program
+    XML2_CONFIG="no"
+    if test "$withval" != "yes" && test "$withval" != "maybe" ; then
+        XML2_CONFIG_PATH="$withval/bin"
+        AC_PATH_PROG(XML2_CONFIG, xml2-config,"no", $XML2_CONFIG_PATH)
+    else
+        XML2_CONFIG_PATH=$PATH
+        AC_PATH_PROG(XML2_CONFIG, xml2-config,"no", $XML2_CONFIG_PATH)
+    fi
+
+    dnl we can't do anything without xml2-config
+    if test "$XML2_CONFIG" = "no"; then
+        withval="no"
+    else
+        withval=`$XML2_CONFIG --prefix`
+    fi
+
+    dnl if withval still maybe then we have failed
+    if test "$withval" = "maybe"; then
+        withval = "no"
+    fi
+fi
+
+if test "$withval" = "no"; then
+    AC_MSG_RESULT([Not building with libxml2 - use --with-libxml2 to enable])
+else
+
+    AC_SUBST(LIBXML_REQUIRED_VERSION)
+    AC_MSG_CHECKING(for libxml libraries >= $LIBXML_REQUIRED_VERSION)
+
+    AC_DEFUN([VERSION_TO_NUMBER],
+    [`$1 | sed -e 's/libxml //' | awk 'BEGIN { FS = "."; } { printf "%d", ([$]1 * 1000 + [$]2) * 1000 + [$]3;}'`])
+
+    dnl
+    dnl test version and init our variables
+    dnl
+
+    vers=VERSION_TO_NUMBER($XML2_CONFIG --version)
+    XML2_VERSION=`$XML2_CONFIG --version`
+
+    if test "$vers" -ge VERSION_TO_NUMBER(echo $LIBXML_REQUIRED_VERSION);then
+        LIBXML2_LIB="`$XML2_CONFIG --libs`"
+        LIBXML2_CFLAGS="`$XML2_CONFIG --cflags`"
+        AC_MSG_RESULT(found version $XML2_VERSION)
+    else
+        AC_MSG_ERROR(You need at least libxml2 $LIBXML_REQUIRED_VERSION for this version of swish)
+    fi
+
+
+    AC_DEFINE(HAVE_LIBXML2,[],[Libxml2 support included])
+
+    dnl LIBXML2_OBJS="libswishindex_la-parser.lo"
+    LIBXML2_OBJS="parser.lo"
+    AC_SUBST(LIBXML2_OBJS)
+    AC_SUBST(LIBXML2_LIB)
+    AC_SUBST(LIBXML2_CFLAGS)
+fi
+
+
+
+dnl Provide an option for enabling btree/incremental indexing for development
+AC_ARG_ENABLE(incremental,
+             AC_HELP_STRING([--enable-incremental], [** developer use only **]),btree=yes,)
+
+AC_ARG_ENABLE(psortarray,
+             AC_HELP_STRING([--enable-psortarray], [** and use ARRAY persort arrays (if incremental) ]),psortarray=yes,)
+
+if test x$btree = xyes; then
+    AC_MSG_WARN([** Buidling with developer only incremental indexing code **])
+    BTREE_OBJS="btree.lo array.lo worddata.lo fhash.lo"
+    AC_SUBST(BTREE_OBJS)
+    AC_DEFINE(USE_BTREE,[],[Experimental BTREE support])
+
+    if test "x$psortarray" = xyes; then
+        AC_MSG_WARN([** And using ARRAY presorted tables **])
+        AC_DEFINE(USE_PRESORT_ARRAY,[],[Experimental BTREE PRESORT ARRAYS])
+    fi
+fi
+
+
+dnl Checks for zlib library. -- from libxml2 configure.in
+_cppflags="${CPPFLAGS}"
+_ldflags="${LDFLAGS}"
+
+dnl AC_ARG_WITH(zlib,AC_HELP_STRING([--with-zlib=DIR], [use zlib in DIR (YES if found)]),,withval=maybe)
+
+AC_ARG_WITH(zlib,
+[  --with-zlib[[=DIR]]       use libz in DIR],[
+  if test "$withval" != "no" -a "$withval" != "yes"; then
+    Z_DIR=$withval
+    CPPFLAGS="${CPPFLAGS} -I$withval/include"
+    LDFLAGS="${LDFLAGS} -L$withval/lib"
+  fi
+])
+if test "$with_zlib" = "no"; then
+    echo "Disabling compression support"
+else
+    AC_CHECK_HEADERS(zlib.h,
+        AC_CHECK_LIB(z, gzread,[
+            AC_DEFINE(HAVE_ZLIB,[],[Do we have zlib])
+            if test "x${Z_DIR}" != "x"; then
+                Z_CFLAGS="-I${Z_DIR}/include"
+                Z_LIBS="-L${Z_DIR}/lib -lz"
+                [case ${host} in
+                    *-*-solaris*)
+                        Z_LIBS="-L${Z_DIR}/lib -R${Z_DIR}/lib -lz"
+                        ;;
+                esac]
+            else
+                Z_LIBS="-lz"
+            fi]))
+fi
+
+dnl mingw build requires this for win32
+if test "x${target}" == "xi586-mingw32msvc"; then
+     Z_LIBS="-L${Z_DIR}/lib -R${Z_DIR}/lib -lzdll"
+fi
+
+echo "Z_LIBS = $Z_LIBS"
+
+
+AC_SUBST(Z_CFLAGS)
+AC_SUBST(Z_LIBS)
+
+
+CPPFLAGS=${_cppflags}
+LDFLAGS=${_ldflags}
+
+
+PCRE_REQUIRED_VERSION=3.4
+AC_ARG_WITH(pcre,AC_HELP_STRING([--with-pcre=DIR], [use pcre in DIR (YES if found)]),,withval=no)
+
+dnl if withval not no then try to enable pcre support
+if test "$withval" != "no"; then
+    dnl find pcre-config program
+    PCRE_CONFIG="no"
+    if test "$withval" != "yes" && test "$withval" != "maybe" ; then
+        PCRE_CONFIG_PATH="$withval/bin"
+        AC_PATH_PROG(PCRE_CONFIG, pcre-config,"no", $PCRE_CONFIG_PATH)
+    else
+        PCRE_CONFIG_PATH=$PATH
+        AC_PATH_PROG(PCRE_CONFIG, pcre-config,"no", $PCRE_CONFIG_PATH)
+    fi
+
+    dnl we won't do anything without pcre-config
+    if test "$PCRE_CONFIG" = "no"; then
+        withval="no"
+    else
+        withval=`$PCRE_CONFIG --prefix`
+    fi
+
+    dnl if withval still maybe then we have failed
+    if test "$withval" = "maybe"; then
+        withval = "no"
+    fi
+fi
+
+if test "$withval" != "no"; then
+    AC_SUBST(PCRE_REQUIRED_VERSION)
+    AC_MSG_CHECKING(for libpcre libraries >= $PCRE_REQUIRED_VERSION)
+
+    AC_DEFUN([VERSION_TO_NUMBER],
+    [`$1 | awk 'BEGIN { FS = "."; } { printf "%d", ([$]1 * 1000 + [$]2) * 1000 + [$]3;}'`])
+
+    dnl
+    dnl test version and init our variables
+    dnl
+
+    vers=VERSION_TO_NUMBER($PCRE_CONFIG --version)
+    PCRE_VERSION=`$PCRE_CONFIG --version`
+
+    if test "$vers" -ge VERSION_TO_NUMBER(echo $PCRE_REQUIRED_VERSION);then
+        PCRE_LIBS="`$PCRE_CONFIG --libs-posix`"
+        PCRE_CFLAGS="`$PCRE_CONFIG --cflags-posix`"
+        AC_MSG_RESULT(found version $PCRE_VERSION)
+    else
+        AC_MSG_ERROR(You need at least libpcre $PCRE_REQUIRED_VERSION for this version of swish)
+    fi
+
+    AC_SUBST(PCRE_CFLAGS)
+    AC_SUBST(PCRE_LIBS)
+    AC_DEFINE(HAVE_PCRE,[],[Perl REGEX library])
+else
+    AC_MSG_RESULT([Not building with perl compatible regex - use --with-pcre to enable])
+fi
+
+dnl enable largefile support by default. disable with --disable-largefile
+AC_SYS_LARGEFILE
+AC_MSG_NOTICE([fileoffset bits = ${ac_cv_sys_file_offset_bits}])
+if test "x${ac_cv_sys_file_offset_bits}" == "x64" ; 
+then
+	LARGEFILES_MACROS="-D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=$ac_cv_sys_file_offset_bits"
+fi
+AC_SUBST(LARGEFILES_MACROS)
+
+CPPFLAGS=${_cppflags}
+LDFLAGS=${_ldflags}
+
+dnl Set a better default for libexecdir -- Thanks to David Norris!
+libexecdiropt=$(echo $ac_option | grep 'libexecdir=')
+if test "x$libexecdiropt" = "x"; then
+        libexecdir='${exec_prefix}/lib/${PACKAGE}'
+        AC_MSG_NOTICE([Setting libexecdir to \${exec_prefix}/lib/${PACKAGE}])
+fi
+
+dnl Memory Debugging options
+
+ENABLE_DEFINE([memdebug], [MEM_DEBUG], [(developers only) checks for memory consistency on alloc/free using guards])
+ENABLE_DEFINE([memtrace], [MEM_TRACE], [(developers only)  checks for unfreed memory, and where it is allocated] )
+ENABLE_DEFINE([memstats], [MEM_STATISTICS], [(developers only) gives memory statistics (bytes allocated, calls, etc)])
+
+
+
+dnl Which files to create (some .in files are handled by Makefile.am files)
+
+AC_CONFIG_FILES(
+    Makefile
+    html/Makefile
+    pod/Makefile
+    man/Makefile
+    src/Makefile
+    src/expat/Makefile
+    src/replace/Makefile
+    src/snowball/Makefile
+    rpm/swish-e.spec
+    tests/Makefile
+    example/Makefile
+    prog-bin/Makefile
+    filters/Makefile
+    filters/SWISH/Makefile
+    conf/Makefile
+    filter-bin/Makefile
+    swish-e.pc
+    swish-config)
+AC_OUTPUT
+

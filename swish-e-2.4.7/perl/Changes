@@ -1,0 +1,28 @@
+Revision history for Perl extension SWISH::API
+
+## $Id: Changes 1994 2007-12-14 14:25:55Z karpet $ ##
+
+0.04  Thu Jul 14 11:59:04 CDT 2005
+        Added perlize() function to make all method names Perl-ish.
+        Fixed namespace issue with SwishFuzzy (now SwishFuzzify)
+
+
+0.03  Wed Sep 01, 2004
+
+	Added RankScheme to access the new RankScheme feature.
+	IgnoreTotalWordCountWhenRanking set to 0 in test.config.
+	[karman]
+
+
+0.02  Sun May 02, 2004
+
+	Added access to MetaNames and PropertyNames defined 
+	in the index.
+
+0.01  Mon Oct 14, 2002
+
+	Initial module [moseley]
+
+
+
+
